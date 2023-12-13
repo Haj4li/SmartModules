@@ -3,7 +3,7 @@
 #include <ESP8266WebServer.h>
 
 #include "Smart.h"
-
+#include "Pages.h"
 Module PC(A0,true);
 
 const char* ssid = "KhaneHoshmand";
@@ -32,6 +32,11 @@ void handleToggle() {
   server.send(200, "text/plain", "LED toggled");
 }
 
+void handleLogin_Page()
+{
+  server.send(200, "text/html", p_login);
+}
+
 void handleGetValue() {
   pval = PC.GetValue<int>(Analog);
   Serial.println(pval);
@@ -54,6 +59,7 @@ void setup() {
   server.on("/", handleRoot);
   server.on("/toggle", handleToggle);
   server.on("/getvalue", handleGetValue);
+  server.on("/login", handleLogin_Page);
 
   server.begin();
   Serial.println("HTTP server started");
