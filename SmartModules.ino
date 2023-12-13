@@ -4,24 +4,42 @@
 
 #include "Smart.h"
 #include "Pages.h"
+
+/*
+  Todo:
+    [ ] Set and get cookies (auth)
+    [ ] add buzzer for alarm
+    [ ] add ultrasonic module (for parking of course)
+
+*/
+
+
+// Photocell
 Module PC(A0,true);
+// Valid login led
 Module LEDv(D0,false);
+// Not valid login led
 Module LEDl(D1,false);
+// SSID and password for nodemcu AP
 const char* ssid = "KhaneHoshmand";
 const char* password = "12345678";
 
+// Running server on port 80
 ESP8266WebServer server(80);
 
+// Something for debuging
 const int ledPin = LED_BUILTIN;
 int ledState = LOW;
 int pval = 10;
 
-
+// Valid username and password for login
 const char* validUsername = "ali";
 const char* validPassword = "1234";
 
+// Login attempts (3 Max)
 short attempts = 0;
 
+// The main page
 void handleRoot() {
   String html = "<html><body>";
   html += "<h1 id='value'>Value: " + String(pval) + "</h1>";
@@ -44,15 +62,18 @@ void handleLogin_Page()
   server.send(200, "text/html", p_login);
 }
 
+// Get module value everytime function called
 void handleGetValue() {
   pval = PC.GetValue<int>(Analog);
   Serial.println(pval);
   server.send(200, "text/plain", String(pval));
 }
+// validate posted args for login user
 void validateLogin()
 {
   if (server.hasArg("username") && server.hasArg("password")) {
     if (server.arg("username") == validUsername && server.arg("password") == validPassword) {
+      // redirect to main page
       server.sendHeader("Location", "/");
       server.send(303);
       LEDv.SetValue(HIGH,Digital);
@@ -65,11 +86,11 @@ void validateLogin()
       attempts++;
       if (attempts >= 3)
       {
-        LEDl.SetValue(HIGH,Digital);
+        LEDl.SetValue(HIGH,Digital); // notify the house if there was 3 attempts or more to login to panel
       }
     }
   }
-
+  // redirect to login page
   server.sendHeader("Location", "/login");
   server.send(303);
 }
