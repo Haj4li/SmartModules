@@ -56,6 +56,7 @@ void validateLogin()
       server.sendHeader("Location", "/");
       server.send(303);
       LEDv.SetValue(HIGH,Digital);
+      LEDl.SetValue(LOW,Digital);
       attempts=0;
       return;
     }
@@ -64,7 +65,7 @@ void validateLogin()
       attempts++;
       if (attempts >= 3)
       {
-        LEDv.SetValue(HIGH,Digital);
+        LEDl.SetValue(HIGH,Digital);
       }
     }
   }
