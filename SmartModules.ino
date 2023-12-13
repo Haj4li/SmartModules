@@ -5,15 +5,22 @@
 #include "Smart.h"
 #include "Pages.h"
 Module PC(A0,true);
-
+Module LEDv(D0,false);
+Module LEDl(D1,false);
 const char* ssid = "KhaneHoshmand";
 const char* password = "12345678";
 
 ESP8266WebServer server(80);
 
-int ledPin = LED_BUILTIN;
+const int ledPin = LED_BUILTIN;
 int ledState = LOW;
 int pval = 10;
+
+
+const char* validUsername = "ali";
+const char* validPassword = "1234";
+
+short attempts = 0;
 
 void handleRoot() {
   String html = "<html><body>";
@@ -42,7 +49,29 @@ void handleGetValue() {
   Serial.println(pval);
   server.send(200, "text/plain", String(pval));
 }
+void validateLogin()
+{
+  if (server.hasArg("username") && server.hasArg("password")) {
+    if (server.arg("username") == validUsername && server.arg("password") == validPassword) {
+      server.sendHeader("Location", "/");
+      server.send(303);
+      LEDv.SetValue(HIGH,Digital);
+      attempts=0;
+      return;
+    }
+    else
+    {
+      attempts++;
+      if (attempts >= 3)
+      {
+        LEDv.SetValue(HIGH,Digital);
+      }
+    }
+  }
 
+  server.sendHeader("Location", "/login");
+  server.send(303);
+}
 
 void setup() {
   Serial.begin(9600);
@@ -60,6 +89,7 @@ void setup() {
   server.on("/toggle", handleToggle);
   server.on("/getvalue", handleGetValue);
   server.on("/login", handleLogin_Page);
+  server.on("/loginvalid",validateLogin);
 
   server.begin();
   Serial.println("HTTP server started");
