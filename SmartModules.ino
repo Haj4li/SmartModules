@@ -31,7 +31,7 @@ const char* password = "12345689";
 // Something for debuging
 const int ledPin = LED_BUILTIN;
 int ledState = LOW;
-int pval = 10;
+int pval = 0;
 
 // Valid username and password for login
 const char* validUsername = "ali";
@@ -44,11 +44,13 @@ short attempts = 0;
 void handleRoot() {
   is_authenticated("/login");
   String html = "<html><body>";
-  html += "<h1 id='value'>Value: " + String(pval) + "</h1>";
+  html += "<h1 id='photocell'>Photocell: 0</h1>";
+  html += "<h1 id='distance'>Distance: 0</h1>";
   html += "<button onclick=\"togglePin()\">Toggle LED</button>";
   html += " <a href=\"/login?DIS=1\">Disconnect</a>";
   html += "<script>function togglePin(){var xhr=new XMLHttpRequest();xhr.open('GET','/setvalue',true);xhr.send();}</script>";
-  html += "<script>setInterval(updateValue, 10000);function updateValue(){var xhr=new XMLHttpRequest();xhr.onreadystatechange=function(){if(xhr.readyState===4&&xhr.status===200){document.getElementById('value').innerHTML='Value: '+xhr.responseText;}};xhr.open('GET','/getvalue',true);xhr.send();}</script>";
+  html += "<script>function updateValue() {var xhr = new XMLHttpRequest();xhr.onreadystatechange = function () {if (xhr.readyState === 4 && xhr.status === 200) {var data = xhr.responseText;console.debug(data);var values = data.split(';');for (var i = 0; i < values.length; i++) {var keyValue = values[i].split(':');var key = keyValue[0];var value = keyValue[1];if (key && value) {document.getElementById(key).innerHTML = key + ': ' + value;}}}};xhr.open('GET', '/getvalue', true);xhr.send();}</script>";
+  html += "<script>setInterval(updateValue, 1000);</script>";
   html += "</body></html>";
 
   server.send(200, "text/html", html);
@@ -72,8 +74,15 @@ void handleLogin_Page()
 
 // Get module value everytime function called
 void handleGetValue() {
-  pval = PC.GetValue<int>(Analog);
-  server.send(200, "text/plain", String(pval));
+  String data = "";
+  data += "photocell:";
+  data += PC.GetValue<int>(Analog);
+  data += ";";
+  data += "distance:";
+  data += 0;
+  data += ";";
+  
+  server.send(200, "text/plain", String(data));
 }
 // validate posted args for login user
 void validateLogin()
