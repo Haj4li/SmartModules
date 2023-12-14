@@ -1,18 +1,19 @@
-#include <ESP8266WiFi.h>
-#include <WiFiClient.h>
-#include <ESP8266WebServer.h>
+#include "Helper.h"
+#include "Auth.h"
 
 #include "Smart.h"
 #include "Pages.h"
 
 /*
   Todo:
-    [ ] Set and get cookies (auth)
-    [ ] add buzzer for alarm
+    [X] Set and get cookies (auth)
+    [X] add buzzer for alarm
     [ ] add ultrasonic module (for parking of course)
 
 */
-
+// WC to connect to wifi
+// AP to work as AP
+#define WC
 
 // Photocell
 Module PC(A0,true);
@@ -20,12 +21,12 @@ Module PC(A0,true);
 Module LEDv(D0,false);
 // Not valid login led
 Module LEDl(D1,false);
-// SSID and password for nodemcu AP
-const char* ssid = "KhaneHoshmand";
-const char* password = "12345678";
 
-// Running server on port 80
-ESP8266WebServer server(80);
+// SSID and password for nodemcu
+const char* ssid = "ali";
+const char* password = "12345689";
+
+
 
 // Something for debuging
 const int ledPin = LED_BUILTIN;
@@ -41,31 +42,37 @@ short attempts = 0;
 
 // The main page
 void handleRoot() {
+  is_authenticated("/login");
   String html = "<html><body>";
   html += "<h1 id='value'>Value: " + String(pval) + "</h1>";
   html += "<button onclick=\"togglePin()\">Toggle LED</button>";
-  html += "<script>function togglePin(){var xhr=new XMLHttpRequest();xhr.open('GET','/toggle',true);xhr.send();}</script>";
-  html += "<script>setInterval(updateValue, 1000);function updateValue(){var xhr=new XMLHttpRequest();xhr.onreadystatechange=function(){if(xhr.readyState===4&&xhr.status===200){document.getElementById('value').innerHTML='Value: '+xhr.responseText;}};xhr.open('GET','/getvalue',true);xhr.send();}</script>";
+  html += " <a href=\"/login?DIS=1\">Disconnect</a>";
+  html += "<script>function togglePin(){var xhr=new XMLHttpRequest();xhr.open('GET','/setvalue',true);xhr.send();}</script>";
+  html += "<script>setInterval(updateValue, 10000);function updateValue(){var xhr=new XMLHttpRequest();xhr.onreadystatechange=function(){if(xhr.readyState===4&&xhr.status===200){document.getElementById('value').innerHTML='Value: '+xhr.responseText;}};xhr.open('GET','/getvalue',true);xhr.send();}</script>";
   html += "</body></html>";
 
   server.send(200, "text/html", html);
 }
 
-void handleToggle() {
+void haldleSetValue()
+{
+  is_authenticated("/login");
   ledState = !ledState;
   digitalWrite(ledPin, ledState);
   server.send(200, "text/plain", "LED toggled");
 }
-
 void handleLogin_Page()
 {
+  if (server.hasArg("DIS")) {
+    deauth("/login");
+    return;
+  }
   server.send(200, "text/html", p_login);
 }
 
 // Get module value everytime function called
 void handleGetValue() {
   pval = PC.GetValue<int>(Analog);
-  Serial.println(pval);
   server.send(200, "text/plain", String(pval));
 }
 // validate posted args for login user
@@ -74,8 +81,7 @@ void validateLogin()
   if (server.hasArg("username") && server.hasArg("password")) {
     if (server.arg("username") == validUsername && server.arg("password") == validPassword) {
       // redirect to main page
-      server.sendHeader("Location", "/");
-      server.send(303);
+      auth("/");
       LEDv.SetValue(HIGH,Digital);
       LEDl.SetValue(LOW,Digital);
       attempts=0;
@@ -100,24 +106,42 @@ void setup() {
   pinMode(ledPin, OUTPUT);
   digitalWrite(ledPin, ledState);
 
-  WiFi.mode(WIFI_AP);
-  WiFi.softAP(ssid, password);
+  #ifdef AP
+    Serial.println("Creating AP...");
+    WiFi.mode(WIFI_AP);
+    WiFi.softAP(ssid, password);
 
-  IPAddress apIP = WiFi.softAPIP();
-  Serial.print("AP IP address: ");
-  Serial.println(apIP);
+    IPAddress apIP = WiFi.softAPIP();
+    Serial.print("AP IP address: ");
+    Serial.println(apIP);
+  #else
+    Serial.println("Connecting to AP...");
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(ssid, password);
+    while (WiFi.status() != WL_CONNECTED) {
+      delay(500);
+    }
+    Serial.print("Client IP address: ");
+    Serial.println(WiFi.localIP());
+  #endif
 
   server.on("/", handleRoot);
-  server.on("/toggle", handleToggle);
-  server.on("/getvalue", handleGetValue);
+
   server.on("/login", handleLogin_Page);
   server.on("/loginvalid",validateLogin);
+
+  server.on("/setvalue", haldleSetValue);
+  server.on("/getvalue", handleGetValue);
+
+  
+  server.onNotFound([](){server.send(404, "text/plain", "404 Room not found :/");});
+
+  server.collectHeaders("Cookie");
 
   server.begin();
   Serial.println("HTTP server started");
 }
 
 void loop() {
-  
   server.handleClient();
 }
