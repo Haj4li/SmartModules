@@ -11,6 +11,8 @@
     [x] add ultrasonic module (for parking of course)
 
 */
+
+
 // WC to connect to wifi
 // AP to work as AP
 #define AP
@@ -40,8 +42,8 @@ unsigned int gas = 0;
 
 
 // SSID and password for nodemcu
-const char* ssid = "ali";
-const char* password = "12345689";
+const char* ssid = "Homino";
+const char* password = "h1234567";
 
 
 
@@ -96,10 +98,13 @@ void GetData()
 void handleRoot() {
   is_authenticated("/login");
   String html = "<html><body>";
-  html += "<h1 id='Gas'>Photocell: 0</h1>";
-  html += "<h1 id='distance'>Distance: 0</h1>";
-  html += "<h1 id='House'>Distance: 0</h1>";
+
+  html += "<h1 id='Gas'>Gas: 0</h1>";
+  html += "<h1 id='Distance'>Distance: 0</h1>";
+  html += "<h1 id='House'>House: 0</h1>";
+
   html += "<button onclick=\"togglePin()\">Toggle LED</button>";
+  
   html += " <a href=\"/login?DIS=1\">Disconnect</a>";
   html += "<script>function togglePin(){var xhr=new XMLHttpRequest();xhr.open('GET','/setvalue',true);xhr.send();}</script>";
   html += "<script>function updateValue() {var xhr = new XMLHttpRequest();xhr.onreadystatechange = function () {if (xhr.readyState === 4 && xhr.status === 200) {var data = xhr.responseText;console.debug(data);var values = data.split(';');for (var i = 0; i < values.length; i++) {var keyValue = values[i].split(':');var key = keyValue[0];var value = keyValue[1];if (key && value) {document.getElementById(key).innerHTML = key + ': ' + value;}}}};xhr.open('GET', '/getvalue', true);xhr.send();}</script>";
@@ -131,7 +136,7 @@ void handleGetValue() {
   gas = PC.GetValue<int>(Analog);
   data += gas;
   data += ";";
-  data += "distance:";
+  data += "Distance:";
   data += distance;
   data += ";";
   data += "House:";
@@ -169,7 +174,7 @@ void validateLogin()
       attempts++;
       if (attempts >= 3)
       {
-        Serial.println("Error..");
+        //Serial.println("Error..");
         ALARM.SetValue(HIGH,Digital); // notify the house if there was 3 attempts or more to login to panel
       }
     }
@@ -180,26 +185,27 @@ void validateLogin()
 }
 
 void setup() {
-  Serial.begin(115200);
+  //Serial.begin(115200);
   pinMode(echoPin, INPUT); 
 
   #ifdef AP
-    Serial.println("Creating AP...");
+    //Serial.println("Creating AP...");
     WiFi.mode(WIFI_AP);
+    //WiFi.softAPConfig(staticIP, NULL, subnet);
     WiFi.softAP(ssid, password);
 
     IPAddress apIP = WiFi.softAPIP();
-    Serial.print("AP IP address: ");
-    Serial.println(apIP);
+    //Serial.print("AP IP address: ");
+    //Serial.println(apIP);
   #else
-    Serial.println("Connecting to AP...");
+    //Serial.println("Connecting to AP...");
     WiFi.mode(WIFI_STA);
     WiFi.begin(ssid, password);
     while (WiFi.status() != WL_CONNECTED) {
       delay(500);
     }
-    Serial.print("Client IP address: ");
-    Serial.println(WiFi.localIP());
+    //Serial.print("Client IP address: ");
+    //Serial.println(WiFi.localIP());
   #endif
 
   server.on("/", handleRoot);
@@ -216,7 +222,7 @@ void setup() {
   server.collectHeaders("Cookie");
 
   server.begin();
-  Serial.println("HTTP server started");
+  //Serial.println("HTTP server started");
 }
 
 void loop() {
