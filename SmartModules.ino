@@ -8,19 +8,36 @@
   Todo:
     [X] Set and get cookies (auth)
     [X] add buzzer for alarm
-    [ ] add ultrasonic module (for parking of course)
+    [x] add ultrasonic module (for parking of course)
 
 */
 // WC to connect to wifi
 // AP to work as AP
-#define WC
+#define AP
+#define interval 1000
+
+
+unsigned long timer = 0;
 
 // Photocell
 Module PC(A0,true);
 // Valid login led
 Module LEDv(D0,false);
 // Not valid login led
-Module LEDl(D1,false);
+Module ALARM(D1,false);
+// Flame
+Module FLAME(D2,true);
+// parking led
+Module PARKINGLED(D5,false);
+
+// ultrasonic
+Module UTRIG(D3,false);
+#define echoPin D4
+
+unsigned int distance = 0;
+unsigned int gas = 0;
+
+
 
 // SSID and password for nodemcu
 const char* ssid = "ali";
@@ -29,9 +46,7 @@ const char* password = "12345689";
 
 
 // Something for debuging
-const int ledPin = LED_BUILTIN;
 int ledState = LOW;
-int pval = 0;
 
 // Valid username and password for login
 const char* validUsername = "ali";
@@ -40,12 +55,50 @@ const char* validPassword = "1234";
 // Login attempts (3 Max)
 short attempts = 0;
 
+
+void GetData()
+{
+  unsigned long currentmilies = millis();
+  if (FLAME.GetValue<int>(Digital) == LOW || gas > 700)
+  {
+    ALARM.SetValue(HIGH,Digital);
+  }
+  else
+  {
+    if (attempts < 3)
+      ALARM.SetValue(LOW,Digital);
+  }
+  if (currentmilies - timer > interval)
+  {
+    timer = currentmilies;
+    // distance 
+    
+    UTRIG.SetValue(HIGH, Digital);
+    delayMicroseconds(10);
+    UTRIG.SetValue(LOW, Digital);
+    distance =  pulseIn(echoPin, HIGH) * 0.017;
+    if (distance < 60 && distance > 17)
+    {
+      PARKINGLED.SetValue(HIGH,Digital);
+    }
+    else
+    {
+      PARKINGLED.SetValue(LOW,Digital);
+    }
+    
+
+
+  }
+
+}
+
 // The main page
 void handleRoot() {
   is_authenticated("/login");
   String html = "<html><body>";
-  html += "<h1 id='photocell'>Photocell: 0</h1>";
+  html += "<h1 id='Gas'>Photocell: 0</h1>";
   html += "<h1 id='distance'>Distance: 0</h1>";
+  html += "<h1 id='House'>Distance: 0</h1>";
   html += "<button onclick=\"togglePin()\">Toggle LED</button>";
   html += " <a href=\"/login?DIS=1\">Disconnect</a>";
   html += "<script>function togglePin(){var xhr=new XMLHttpRequest();xhr.open('GET','/setvalue',true);xhr.send();}</script>";
@@ -59,8 +112,7 @@ void handleRoot() {
 void haldleSetValue()
 {
   is_authenticated("/login");
-  ledState = !ledState;
-  digitalWrite(ledPin, ledState);
+  LEDv.SetValue(ledState,Digital);
   server.send(200, "text/plain", "LED toggled");
 }
 void handleLogin_Page()
@@ -75,11 +127,26 @@ void handleLogin_Page()
 // Get module value everytime function called
 void handleGetValue() {
   String data = "";
-  data += "photocell:";
-  data += PC.GetValue<int>(Analog);
+  data += "Gas:";
+  gas = PC.GetValue<int>(Analog);
+  data += gas;
   data += ";";
   data += "distance:";
-  data += 0;
+  data += distance;
+  data += ";";
+  data += "House:";
+  if (FLAME.GetValue<int>(Digital) == LOW)
+  {
+    data += "ON FIRE!";
+  }
+  else if (gas > 840)
+  {
+    data += "GAAAAS You are about to die (slowly)";
+  }
+  else
+  {
+    data += "Normal";
+  }
   data += ";";
   
   server.send(200, "text/plain", String(data));
@@ -92,7 +159,8 @@ void validateLogin()
       // redirect to main page
       auth("/");
       LEDv.SetValue(HIGH,Digital);
-      LEDl.SetValue(LOW,Digital);
+      if (FLAME.GetValue<int>(Digital) != HIGH || gas <= 700)
+        ALARM.SetValue(LOW,Digital);
       attempts=0;
       return;
     }
@@ -101,7 +169,8 @@ void validateLogin()
       attempts++;
       if (attempts >= 3)
       {
-        LEDl.SetValue(HIGH,Digital); // notify the house if there was 3 attempts or more to login to panel
+        Serial.println("Error..");
+        ALARM.SetValue(HIGH,Digital); // notify the house if there was 3 attempts or more to login to panel
       }
     }
   }
@@ -111,9 +180,8 @@ void validateLogin()
 }
 
 void setup() {
-  Serial.begin(9600);
-  pinMode(ledPin, OUTPUT);
-  digitalWrite(ledPin, ledState);
+  Serial.begin(115200);
+  pinMode(echoPin, INPUT); 
 
   #ifdef AP
     Serial.println("Creating AP...");
@@ -152,5 +220,6 @@ void setup() {
 }
 
 void loop() {
+  GetData();
   server.handleClient();
 }
