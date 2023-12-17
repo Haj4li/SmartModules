@@ -4,7 +4,7 @@
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h>
 #include <ESP8266WebServer.h>
-
+#include <DHT.h>
 // //Static IP address configuration
 // IPAddress staticIP(192, 168, 18, 12); //ESP static ip
 // IPAddress subnet(255, 255, 255, 0);  //Subnet mask

@@ -18,17 +18,26 @@
 #define AP
 #define interval 1000
 
+#define DHTPIN D6    // what pin we're connected to
+#define DHTTYPE DHT11   // DHT 11  (AM2302)
+// Initialize DHT sensor for normal 16mhz Arduino
+DHT dht(DHTPIN, DHTTYPE);
+
 
 unsigned long timer = 0;
 
 // Photocell
 Module PC(A0,true);
-// Valid login led
-Module LEDv(D0,false);
-// Not valid login led
+// Turnon modules
+Module LOCK(D0,true);
+// Buzzer flag
+Module BFLAG(D8,true);
+// ALARM
 Module ALARM(D1,false);
 // Flame
 Module FLAME(D2,true);
+// Room lights
+Module ROOMLED(D7,false);
 // parking led
 Module PARKINGLED(D5,false);
 
@@ -39,7 +48,8 @@ Module UTRIG(D3,false);
 unsigned int distance = 0;
 unsigned int gas = 0;
 
-
+float hum;  //Stores humidity value
+float temp; //Stores temperature value
 
 // SSID and password for nodemcu
 const char* ssid = "Homino";
@@ -48,7 +58,8 @@ const char* password = "h1234567";
 
 
 // Something for debuging
-int ledState = LOW;
+int ROOMLEDs = LOW;
+
 
 // Valid username and password for login
 const char* validUsername = "ali";
@@ -60,14 +71,17 @@ short attempts = 0;
 
 void GetData()
 {
+  hum = dht.readHumidity();
+  temp= dht.readTemperature();
+
   unsigned long currentmilies = millis();
-  if (FLAME.GetValue<int>(Digital) == LOW || gas > 700)
+  if (FLAME.GetValue<int>(Digital) == LOW || gas > 640 || BFLAG.GetValue<int>(Digital) == HIGH)
   {
     ALARM.SetValue(HIGH,Digital);
   }
   else
   {
-    if (attempts < 3)
+    if (attempts < 3 && BFLAG.GetValue<int>(Digital) == LOW)
       ALARM.SetValue(LOW,Digital);
   }
   if (currentmilies - timer > interval)
@@ -102,9 +116,11 @@ void handleRoot() {
   html += "<h1 id='Gas'>Gas: 0</h1>";
   html += "<h1 id='Distance'>Distance: 0</h1>";
   html += "<h1 id='House'>House: 0</h1>";
+  html += "<h1 id='Humidity'>Humidity: 0</h1>";
+  html += "<h1 id='Temp'>Temp: 0</h1>";
 
-  html += "<button onclick=\"togglePin()\">Toggle LED</button>";
-  
+  html += "<button onclick=\"togglePin()\">Room Lights</button>";
+
   html += " <a href=\"/login?DIS=1\">Disconnect</a>";
   html += "<script>function togglePin(){var xhr=new XMLHttpRequest();xhr.open('GET','/setvalue',true);xhr.send();}</script>";
   html += "<script>function updateValue() {var xhr = new XMLHttpRequest();xhr.onreadystatechange = function () {if (xhr.readyState === 4 && xhr.status === 200) {var data = xhr.responseText;console.debug(data);var values = data.split(';');for (var i = 0; i < values.length; i++) {var keyValue = values[i].split(':');var key = keyValue[0];var value = keyValue[1];if (key && value) {document.getElementById(key).innerHTML = key + ': ' + value;}}}};xhr.open('GET', '/getvalue', true);xhr.send();}</script>";
@@ -116,12 +132,21 @@ void handleRoot() {
 
 void haldleSetValue()
 {
+    if (LOCK.GetValue<int>(Digital) != HIGH)
+  {
+    return;
+  }
   is_authenticated("/login");
-  LEDv.SetValue(ledState,Digital);
-  server.send(200, "text/plain", "LED toggled");
+  ROOMLED.SetValue(ROOMLEDs,Digital);
+  ROOMLEDs = !ROOMLEDs;
+  server.send(200, "text/plain", "Lights toggled");
 }
 void handleLogin_Page()
 {
+    if (LOCK.GetValue<int>(Digital) != HIGH)
+  {
+    return;
+  }
   if (server.hasArg("DIS")) {
     deauth("/login");
     return;
@@ -131,6 +156,10 @@ void handleLogin_Page()
 
 // Get module value everytime function called
 void handleGetValue() {
+    if (LOCK.GetValue<int>(Digital) != HIGH)
+  {
+    return;
+  }
   String data = "";
   data += "Gas:";
   gas = PC.GetValue<int>(Analog);
@@ -142,17 +171,27 @@ void handleGetValue() {
   data += "House:";
   if (FLAME.GetValue<int>(Digital) == LOW)
   {
-    data += "ON FIRE!";
+    data += "ON FIRE (ㆆ _ ㆆ)";
   }
-  else if (gas > 840)
+  
+  else if (gas > 640)
   {
-    data += "GAAAAS You are about to die (slowly)";
+    data += "GAAAAS You are about to die (slowly ☠)";
   }
   else
   {
-    data += "Normal";
+    data += "Normal ツ";
+  }
+  if (BFLAG.GetValue<int>(Digital) == HIGH)
+  {
+    data += "  AND INTRUDER !!!!";
   }
   data += ";";
+  data += "Humidity:";
+  data += hum;
+  data += " %;Temp:";
+  data += temp;
+  data += " °C;";
   
   server.send(200, "text/plain", String(data));
 }
@@ -163,8 +202,7 @@ void validateLogin()
     if (server.arg("username") == validUsername && server.arg("password") == validPassword) {
       // redirect to main page
       auth("/");
-      LEDv.SetValue(HIGH,Digital);
-      if (FLAME.GetValue<int>(Digital) != HIGH || gas <= 700)
+      if (FLAME.GetValue<int>(Digital) != HIGH || gas <= 640 || BFLAG.GetValue<int>(Digital) == LOW)
         ALARM.SetValue(LOW,Digital);
       attempts=0;
       return;
@@ -185,6 +223,7 @@ void validateLogin()
 }
 
 void setup() {
+  dht.begin();
   //Serial.begin(115200);
   pinMode(echoPin, INPUT); 
 
@@ -226,6 +265,10 @@ void setup() {
 }
 
 void loop() {
-  GetData();
+  if (LOCK.GetValue<int>(Digital) == HIGH)
+  {
+    GetData();
+  }
+    
   server.handleClient();
 }
