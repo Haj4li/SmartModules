@@ -1,4 +1,4 @@
-Homino a NodeMCU-based smart house project. The code includes functionalities such as controlling room lights, monitoring gas levels, detecting flames, measuring temperature and humidity, and parking assistance using an ultrasonic module.
+This project is a small part of Homino (a NodeMCU-based smart house project). The code includes functionalities such as controlling room lights, monitoring gas levels, detecting flames, measuring temperature and humidity, and parking assistance using an ultrasonic module.
 
 Table of Contents
 
